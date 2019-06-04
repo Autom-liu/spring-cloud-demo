@@ -1,0 +1,11 @@
+server:
+  port: 8081
+spring:
+  application:
+    name: user-service
+  datasource:
+    url: jdbc:mysql://192.168.56.101:3306/myadmin
+    username: root
+    password: 123456
+mybatis:
+  type-aliases-package: com.edu.scnu.user.bean
