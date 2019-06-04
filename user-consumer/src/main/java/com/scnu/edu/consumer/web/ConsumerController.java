@@ -11,6 +11,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.netflix.hystrix.contrib.javanica.annotation.DefaultProperties;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 import com.scnu.edu.consumer.bean.User;
 import com.scnu.edu.consumer.bean.common.Result;
 
@@ -25,7 +26,9 @@ public class ConsumerController {
 	private LoadBalancerClient ribbonClient;
 	
 	@GetMapping("/{id}")
-	@HystrixCommand
+	@HystrixCommand(commandProperties = {
+			@HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "6000")
+	})
 	public Result<User> queryById(@PathVariable("id") String id) {
 		ServiceInstance instance = ribbonClient.choose("user-service");
 		String host = instance.getHost();
