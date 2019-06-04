@@ -1,8 +1,8 @@
 server:
-  port: 8080
+  port: 10086
 spring:
   application:
-    name: user-consumer
+    name: eureka-server
 eureka:
   client:
     service-url:
