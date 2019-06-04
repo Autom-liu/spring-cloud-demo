@@ -9,7 +9,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.scnu.edu.consumer.bean.User;
+import com.scnu.edu.consumer.bean.common.Result;
 
 @RestController
 @RequestMapping("consumer")
@@ -21,16 +23,20 @@ public class ConsumerController {
 	private LoadBalancerClient ribbonClient;
 	
 	@GetMapping("/{id}")
-	public User queryById(@PathVariable("id") String id) {
+	@HystrixCommand(fallbackMethod = "queryFailback")
+	public Result<User> queryById(@PathVariable("id") String id) {
 		ServiceInstance instance = ribbonClient.choose("user-service");
 		String host = instance.getHost();
 		int port = instance.getPort();
 		
-		
 		String url = String.format("http://%s:%d/user/%s", host, port, id);
 		System.out.println(url);
 		User user = restTemplate.getForObject(url, User.class);
-		return user;
+		return Result.success(user);
+	}
+	
+	public Result<User> queryFailback(String id) {
+		return Result.error("服务器繁忙，请稍后再试....");
 	}
 	
 }
