@@ -33,6 +33,9 @@ public class ConsumerController {
 		ServiceInstance instance = ribbonClient.choose("user-service");
 		String host = instance.getHost();
 		int port = instance.getPort();
+		if (port != 0) {
+			throw new RuntimeException("exception!!");			
+		}
 		
 		String url = String.format("http://%s:%d/user/%s", host, port, id);
 		System.out.println(url);
