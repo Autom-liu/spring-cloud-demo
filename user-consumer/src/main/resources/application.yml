@@ -7,6 +7,7 @@ eureka:
   client:
     service-url:
       defaultZone: http://127.0.0.1:10086/eureka
+    registry-fetch-interval-seconds: 5        # 默认情况下会缓存服务列表的数据，隔一定时间重新拉取更新，通过该参数可以修改拉取时间，在开发环境下通常设置小一点，生产环境下不需要更改
   instance:
     prefer-ip-address: true
     ip-address: 127.0.0.1
