@@ -27,16 +27,18 @@ public class ConsumerController {
 	
 	@GetMapping("/{id}")
 	@HystrixCommand(commandProperties = {
-			@HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "6000")
+			@HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "6000"),
+			@HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "10"),
+			@HystrixProperty(name = "circuitBreaker.sleepWindowInMilliseconds", value = "10000"),
+			@HystrixProperty(name = "circuitBreaker.errorThresholdPercentage", value = "60"),
 	})
 	public Result<User> queryById(@PathVariable("id") String id) {
 		ServiceInstance instance = ribbonClient.choose("user-service");
 		String host = instance.getHost();
 		int port = instance.getPort();
-		if (port != 0) {
-			throw new RuntimeException("exception!!");			
+		if (id.startsWith("11")) {
+			throw new RuntimeException();
 		}
-		
 		String url = String.format("http://%s:%d/user/%s", host, port, id);
 		System.out.println(url);
 		User user = restTemplate.getForObject(url, User.class);
