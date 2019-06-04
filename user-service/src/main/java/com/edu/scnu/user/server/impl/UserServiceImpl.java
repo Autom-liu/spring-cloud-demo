@@ -15,13 +15,6 @@ public class UserServiceImpl implements UserService {
 
 	@Override
 	public User queryById(String id) {
-		// 模拟超时场景
-		try {
-			Thread.sleep(2000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		
 		return userMapper.selectByPrimaryKey(id);
 	}
 	
