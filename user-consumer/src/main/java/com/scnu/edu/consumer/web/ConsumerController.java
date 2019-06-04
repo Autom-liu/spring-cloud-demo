@@ -9,12 +9,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
+import com.netflix.hystrix.contrib.javanica.annotation.DefaultProperties;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.scnu.edu.consumer.bean.User;
 import com.scnu.edu.consumer.bean.common.Result;
 
 @RestController
 @RequestMapping("consumer")
+@DefaultProperties(defaultFallback = "defaultFailback")
 public class ConsumerController {
 	
 	@Autowired
@@ -23,7 +25,7 @@ public class ConsumerController {
 	private LoadBalancerClient ribbonClient;
 	
 	@GetMapping("/{id}")
-	@HystrixCommand(fallbackMethod = "queryFailback")
+	@HystrixCommand
 	public Result<User> queryById(@PathVariable("id") String id) {
 		ServiceInstance instance = ribbonClient.choose("user-service");
 		String host = instance.getHost();
@@ -35,8 +37,8 @@ public class ConsumerController {
 		return Result.success(user);
 	}
 	
-	public Result<User> queryFailback(String id) {
-		return Result.error("服务器繁忙，请稍后再试....");
+	public Result<User> defaultFailback() {
+		return Result.error("服务器繁忙，请稍后再试试....");
 	}
 	
 }
