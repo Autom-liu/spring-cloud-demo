@@ -23,3 +23,12 @@ user-service:
     OkToRetryOnAllOperations: true    # 是否对所有操作都进行重试
     MaxAutoRetriesNextServer: 1       # 切换实例的重试次数
     MaxAutoRetries: 1                 # 对当前实例的重试次数
+    
+hystrix:
+  command:
+    default:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 6000    # 设置hystrix的超时时间
+            
