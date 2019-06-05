@@ -9,6 +9,9 @@ eureka:
       defaultZone:  http://127.0.0.1:10086/eureka
 zuul:
   routes:
-    user-service: /user/**
+    user-service:
+      path: /user/**
+      serviceId: user-service
+      strip-prefix: false
   ignored-services:
     - user-consumer
