@@ -70,5 +70,6 @@
 		<module>user-service</module>
 		<module>user-consumer</module>
 		<module>euraka-server</module>
+		<module>api-gateway</module>
 	</modules>
 </project>
