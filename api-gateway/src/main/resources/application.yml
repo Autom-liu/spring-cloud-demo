@@ -8,10 +8,8 @@ eureka:
     service-url:
       defaultZone:  http://127.0.0.1:10086/eureka
 zuul:
+  prefix: /api
   routes:
-    user-service:
-      path: /user/**
-      serviceId: user-service
-      strip-prefix: false
+    user-service: /user/**
   ignored-services:
     - user-consumer
