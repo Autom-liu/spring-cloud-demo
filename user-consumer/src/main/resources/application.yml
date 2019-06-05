@@ -17,18 +17,23 @@ eureka:
     ip-address: 127.0.0.1
 user-service:
   ribbon:
-    NFLoadBalancerRuleClassName: com.netflix.loadbalancer.RandomRule    # 更换负载均衡策略
-    ConnectTimeOut: 250     #  Ribbon连接超时时间
+    # NFLoadBalancerRuleClassName: com.netflix.loadbalancer.RandomRule    # 更换负载均衡策略
+    ConnectTimeout: 250     #  Ribbon连接超时时间
     ReadTimeout: 1000       #  Ribbon读取数据超时时间
     OkToRetryOnAllOperations: true    # 是否对所有操作都进行重试
-    MaxAutoRetriesNextServer: 1       # 切换实例的重试次数
+    MaxAutoRetriesNextServer: 100      # 切换实例的重试次数
     MaxAutoRetries: 1                 # 对当前实例的重试次数
-    
+feign:
+  hystrix:
+    enabled: true           # 开启feign的hystrix熔断
+ribbon:
+  ConnectTimeout: 500    # 连接超时时长
+  ReadTimeout: 1000         # 读取超时时长
 hystrix:
   command:
     default:
       execution:
         isolation:
           thread:
-            timeoutInMilliseconds: 2000    # 设置hystrix的超时时间
+            timeoutInMilliseconds: 6000    # 设置hystrix的超时时间
             

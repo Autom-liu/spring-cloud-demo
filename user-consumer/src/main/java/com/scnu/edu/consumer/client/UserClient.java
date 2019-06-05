@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.scnu.edu.consumer.bean.User;
 
-@FeignClient("user-service")
+@FeignClient(value = "user-service", fallbackFactory = UserClientFallbackFactory.class)
 @RequestMapping("/user")
 public interface UserClient {
 	

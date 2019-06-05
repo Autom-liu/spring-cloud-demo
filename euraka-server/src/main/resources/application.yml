@@ -10,4 +10,4 @@ eureka:
     register-with-eureka: false   # 不注册自己
   server:
     enable-self-preservation: false       # 自我保护，避免因为网络问题误判失效，一般情况下不需要改
-    eviction-interval-timer-in-ms: 30000  # 失效剔除时间，毫秒单位
+    eviction-interval-timer-in-ms: 300000  # 失效剔除时间，毫秒单位
