@@ -13,3 +13,19 @@ zuul:
     user-service: /user/**
   ignored-services:
     - user-consumer
+  retryable: true   # 开启重试
+# AbstractRibbonCommand
+ribbon:
+  ConnectTimeout: 1000
+  ReadTimeout: 1000
+  MaxAutoRetries: 0
+  MaxAutoRetriesNextServer: 100
+  OkToRetryOnAllOperations: true
+# HystrixCommandProperties
+hystrix:
+  command:
+    default:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 6000    # 设置hystrix的超时时间
