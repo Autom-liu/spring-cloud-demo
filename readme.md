@@ -1,3 +1,6 @@
+
+[TOC]
+
 # spring-cloud 核心功能构建
 
 # spring cloud 基本项目依赖
@@ -359,3 +362,293 @@ ribbon重试机制个人感觉有问题，没成功过，或偶尔成功过
 但请务必先开启spring cloud重试功能：
 
 > spring.cloud.loadbalancer.retry.enabled: true
+
+# Hystrix 降级熔断
+
+所谓熔断，即服务超出一定时长未响应及时反馈用户，避免因为阻塞占用连接。
+
+## 添加Hytrix依赖
+
+pom.xml
+
+```xml
+	<dependency>
+	    <groupId>org.springframework.cloud</groupId>
+	    <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+	</dependency>
+```
+
+## 启动类开启Hystrix注解
+
+### @EnableHystrix
+
+这个注解仅仅只是Hystrix的基本功能，并不通用
+
+### @EnableCircuitBreaker
+
+这个注解包含了服务熔断，服务降级等处理，更为通用
+
+### @SpringCloudApplication
+
+这个注解其实是`@SpringBootApplication`，`@EnableDiscoveryClient`，`@EnableCircuitBreaker`，三者合一，是spring cloud项目开发的基本注解！！
+
+## 设置接口熔断回调
+
+### 局部熔断回调
+
+使用`@HystrixCommand`的`fallbackMethod`属性配置，具体看如下代码：
+
+```java
+@RestController
+@RequestMapping("consumer")
+public class ConsumerController {
+	
+	@Autowired
+	private RestTemplate restTemplate;
+	@Autowired
+	private LoadBalancerClient ribbonClient;
+	
+	@GetMapping("/{id}")
+	@HystrixCommand(fallbackMethod = "queryFailback")
+	public Result<User> queryById(@PathVariable("id") String id) {
+		ServiceInstance instance = ribbonClient.choose("user-service");
+		String host = instance.getHost();
+		int port = instance.getPort();
+		
+		String url = String.format("http://%s:%d/user/%s", host, port, id);
+		System.out.println(url);
+		User user = restTemplate.getForObject(url, User.class);
+		return Result.success(user);
+	}
+	
+	public Result<User> queryFailback(String id) {
+		return Result.error("服务器繁忙，请稍后再试....");
+	}
+	
+}
+```
+
+### 公共熔断回调
+
+所谓公共熔断回调即对整个类生效，只需要在类上配置注解`@DefaultProperties`的`defaultFallback`属性，在需要熔断的方法上加上`@HystrixCommand`即可
+
+参考代码如下：
+
+```java
+@RestController
+@RequestMapping("consumer")
+@DefaultProperties(defaultFallback = "defaultFailback")
+public class ConsumerController {
+	
+	@Autowired
+	private RestTemplate restTemplate;
+	@Autowired
+	private LoadBalancerClient ribbonClient;
+	
+	@GetMapping("/{id}")
+	@HystrixCommand
+	public Result<User> queryById(@PathVariable("id") String id) {
+		ServiceInstance instance = ribbonClient.choose("user-service");
+		String host = instance.getHost();
+		int port = instance.getPort();
+		
+		String url = String.format("http://%s:%d/user/%s", host, port, id);
+		System.out.println(url);
+		User user = restTemplate.getForObject(url, User.class);
+		return Result.success(user);
+	}
+	
+	public Result<User> defaultFailback() {
+		return Result.error("服务器繁忙，请稍后再试试....");
+	}
+	
+}
+```
+
+## 高级配置
+
+### 全局超时时间
+
+> hystrix.command.default.execution.isolation.thread.timeoutInMilliseconds
+
+### 局部超时时间
+
+接口方法上加上如下注解：
+
+```java
+@HystrixCommand(commandProperties = {
+			@HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "6000")
+	})
+```
+
+### 熔断器请求量
+
+熔断器会在一定的请求次数后对请求进行分析统计，并跳入下一个状态，比如统计失败次数过多，将进入熔断状态。
+
+通过如下配置项进行配置：
+
+> circuitBreaker.requestVolumeThreshold
+
+### 出错比例
+
+前面说到达到一定的请求进行一次统计，比如统计失败次数过多，将进入熔断状态，这里的过多，其实是根据一定比例来判定的，即出错比例
+
+可以通过如下配置项进行配置：
+
+> circuitBreaker.errorThresholdPercentage
+
+### 休眠时间窗
+
+熔断器熔断后并不是完事了，还要尝试恢复，因此会在一定的时间后从熔断状态变为半开放状态，测试当前服务集群可用性，这个时间即休眠时间窗
+
+可用通过如下配置项进行配置：
+
+> circuitBreaker.sleepWindowInMilliseconds
+
+通过注解的方式配置，结合**局部超时时间**、**熔断请求量**、**休眠时间窗**、**出错比例**一起使用，最终配置的结果如下：
+
+```java
+@HystrixCommand(commandProperties = {
+			@HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "6000"),
+			@HystrixProperty(name = "circuitBreaker.requestVolumeThreshold", value = "10"),
+			@HystrixProperty(name = "circuitBreaker.sleepWindowInMilliseconds", value = "10000"),
+			@HystrixProperty(name = "circuitBreaker.errorThresholdPercentage", value = "60"),
+	})
+```
+
+# feign
+
+## 基本使用
+
+feign基本功能即代替restTemplate写法，注意它只是远程调用的工具，封装以简化代码开发而已的，并没有改变远程调用的工作。
+
+### 导入依赖
+
+feign 已经包含了ribbon和hystrix依赖，但是为了全面，将同时导入也无所谓
+
+```xml
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-openfeign</artifactId>
+</dependency>
+```
+
+### 启动类添加注解
+
+启动类添加如下注解开启feign客户端
+
+> @EnableFeignClients
+
+### 添加远程调用的服务消费端端接口
+
+feign 远程调用其实是通过配置熟悉的`spring mvc`语法来构造URL，代替restTemplate方式的调用。
+
+方式就是以接口的形式定义相关配置，如URI，返回值，参数列表等。这个接口方法的定义保持和`spring mvc`端的`web`层方法一致。
+
+```java
+@FeignClient("user-service")
+@RequestMapping("/user")
+public interface UserClient {
+
+ 	@GetMapping("/{id}")
+	User queryById(@PathVariable("id") String id);
+}
+```
+
+### 远程调用方式三————面向接口调用
+
+前面说到两种远程调用的方式，都是需要显式指出URL，调用restTemplate，这样写看似代码逻辑清晰，简单明了。但是大量写死的代码造成代码冗余，逻辑重复，可维护性差。因此就出现了最终的高端写法：
+
+面向接口调用，是一个相当抽象的过程，看不出来内部使用什么实现的。方式也很简单，不需要RestTempalte，也不需要LoadBalancerClient，直接注入前面自定义的配置接口即可，具体参考如下代码：
+
+```java
+@RestController
+@RequestMapping("consumer")
+public class ConsumerController {
+	
+	@Autowired
+	private UserClient userClient;
+	
+	@GetMapping("/{id}")
+	public Result<User> queryById(@PathVariable("id") String id) {
+		User user = userClient.queryById(id);
+		return Result.success(user);
+	}
+	
+}
+```
+
+让你完全看不出远程调用的痕迹，这只是一种写法而已，底层仍然时想注册中心发起远程调用的。
+
+这种写法说好听点就是减少代码冗余，避免代码重复，但其实就是装逼式写法，增加了理解难度，看得懂的人秀，看不懂的人怎么也别想不懂...  ^_^
+
+## feign 整合 Ribbon 和 Hystrix 重试和熔断
+
+> 温馨提示：不建议使用，因为没有成功的。__可能是我技术问题__
+
+feign 本身提供了 Ribbon 和 Hystrix，它就相当于是spring cloud家族的一个集成工具，因此导入依赖的时候不需要`ribbon`的相关依赖（`Hystrix`还是要的，因为刚出版，没有完全集成）
+
+### ribbon 和 Hystrix相关配置
+
+大多数和原来一样的，只不过要开启feign
+
+```pro
+spring:
+  application:
+    name: user-consumer
+  cloud:
+    loadbalancer:
+      retry:
+        enabled: true   # 开启spring cloud 重试功能
+user-service:
+  ribbon:
+    # NFLoadBalancerRuleClassName: com.netflix.loadbalancer.RandomRule    # 更换负载均衡策略
+    ConnectTimeout: 250     #  Ribbon连接超时时间
+    ReadTimeout: 1000       #  Ribbon读取数据超时时间
+    OkToRetryOnAllOperations: true    # 是否对所有操作都进行重试
+    MaxAutoRetriesNextServer: 100      # 切换实例的重试次数
+    MaxAutoRetries: 1                 # 对当前实例的重试次数
+feign:
+  hystrix:
+    enabled: true           # 开启feign的hystrix熔断
+ribbon:
+  ConnectTimeout: 500    # 连接超时时长
+  ReadTimeout: 1000         # 读取超时时长
+hystrix:
+  command:
+    default:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 6000    # 设置hystrix的超时时间
+```
+
+### 新建failback工厂作为熔断回调
+
+建议用工厂模式，不然不容易成功
+
+```java
+@Component
+public class UserClientFallbackFactory implements FallbackFactory<UserClient> {
+
+ 	@Override
+	public UserClient create(Throwable cause) {
+		return new UserClient() {
+
+ 			@Override
+			public User queryById(String id) {
+				return null;
+			}
+		};
+	}
+
+}
+```
+
+### 添加远程调用的服务消费端端接口
+
+和之前一样，使用接口，但是需要在@FeignClient注解上添加多一个fallbackFactory 属性：
+
+> @FeignClient(value = "user-service", fallbackFactory = UserClientFallbackFactory.class)
+
+注意，feign的熔断不走hystrix的流程，因此feign配置和hystrix配置是会冲突的，因此如果要用`feign`的熔断功能的话，就要把原来的hystrix熔断相关的注解去掉，不然不会成功。（虽然就没成功过！）
