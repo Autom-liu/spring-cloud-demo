@@ -349,6 +349,8 @@ ribbon重试机制个人感觉有问题，没成功过，或偶尔成功过
 
 但大多数主要就做如下配置即可的：
 
+以下这些配置均是在`AbstractRibbonCommand`类源码中有对应指明
+
 > [service-id].ribbon.ConnectTimeOut  Ribbon连接超时时间
 
 > [service-id].ribbon.ReadTimeout  Ribbon读取数据超时时间
@@ -466,6 +468,8 @@ public class ConsumerController {
 ```
 
 ## 高级配置
+
+以下这些配置其实都在`HystrixCommandProperties`类源码中有对应指出的，并不是乱来的。
 
 ### 全局超时时间
 
@@ -652,3 +656,151 @@ public class UserClientFallbackFactory implements FallbackFactory<UserClient> {
 > @FeignClient(value = "user-service", fallbackFactory = UserClientFallbackFactory.class)
 
 注意，feign的熔断不走hystrix的流程，因此feign配置和hystrix配置是会冲突的，因此如果要用`feign`的熔断功能的话，就要把原来的hystrix熔断相关的注解去掉，不然不会成功。（虽然就没成功过！）
+
+# Zuul网关
+
+是主要的对外接口，外部必须通过网关才能访问具体的微服务，网关同时具有服务聚合的功能。
+
+简单来说，就是Controller
+
+## 基本使用
+
+网关作为单独的项目存在，也是`spring boot`服务
+
+### 添加依赖
+
+```xml
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-netflix-zuul</artifactId>
+</dependency>
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+</dependency>
+```
+
+### 启动类开启Zuul网关注解
+
+> @EnableZuulProxy
+
+注意使用ZuulProxy而不是ZuulApplication，功能更完善
+
+## 高级配置
+
+### 基于服务的路由配置
+
+所谓路由配置即URI到服务的映射关系配置
+
+这其实是Zuul的默认配置，默认它会将所有的服务名称作为前缀到URI上去，因此即使不配置，也可照常访问。
+
+但是有时候需求，并不要求服务名称作为URI前缀访问时，就需要指定配置了。
+
+```
+zuul:
+  routes:
+    user-service:
+      path: /user-service/**
+      serviceId: user-service
+```
+
+### 忽略服务
+
+有时候并不希望有些服务对外使用，但是网关默认是全部注册上的，因此需要配置忽略的服务
+
+```
+zuul:
+  routes:
+    user-service: /user/**
+  ignored-services:
+    - user-consumer
+```
+
+### 局部前缀忽略
+
+访问 zuul.routes.[service-id].path 是需要带前缀的
+
+```
+zuul:
+  routes:
+    user-service:
+      path: /user/**
+      serviceId: user-service
+      strip-prefix: false
+```
+
+### 全局访问前缀
+
+> zuul.prefix: /api
+
+### 整合Ribbon 和 Hystrix
+
+配置其实和之前一个样，只需要加上如下配置即可
+
+> zuul.retryable
+
+```
+zuul:
+  retryable: true   # 开启重试
+ribbon:
+  ConnectTimeout: 1000
+  ReadTimeout: 1000
+  MaxAutoRetries: 0
+  MaxAutoRetriesNextServer: 100
+  OkToRetryOnAllOperations: true
+hystrix:
+  command:
+    default:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 6000    # 设置hystrix的超时时间
+```
+
+## 自定义过滤器
+
+先直接看演示
+
+```java
+@Component
+public class LoginFilter extends ZuulFilter {
+
+	@Override
+	public boolean shouldFilter() {
+		return true;
+	}
+
+	@Override
+	public Object run() throws ZuulException {
+		RequestContext context = RequestContext.getCurrentContext();
+		HttpServletRequest request = context.getRequest();
+		
+		String token = request.getParameter("token");
+		
+		if(StringUtils.isBlank(token)) {
+			// 不存在，则拦截
+			context.setSendZuulResponse(false);
+			HttpServletResponse response = context.getResponse();
+			response.setStatus(HttpStatus.FORBIDDEN.value());
+			response.setContentType("text/json;charset=UTF-8");
+			context.setResponse(response);
+//			context.setResponseStatusCode(HttpStatus.FORBIDDEN.value());
+			
+			context.setResponseBody(JSON.toJSONString(Result.error("没有权限")));
+		}
+		
+		return null;
+	}
+
+	@Override
+	public String filterType() {
+		return FilterConstants.PRE_TYPE;
+	}
+
+	@Override
+	public int filterOrder() {
+		return FilterConstants.PRE_DECORATION_FILTER_ORDER - 1;
+	}
+
+}
+```
